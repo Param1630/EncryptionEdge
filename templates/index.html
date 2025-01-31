@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encryption App</title>
+    <style>
+        /* Apple-like UI Styles */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f7;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #1d1d1f;
+            scroll-behavior: smooth; /* Smooth scrolling */
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1d1d1f;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: #6e6e73;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #d2d2d7;
+            border-radius: 12px;
+            font-size: 1rem;
+            color: #1d1d1f;
+            background-color: #f5f5f7;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea:focus, input:focus {
+            border-color: #007aff;
+            outline: none;
+        }
+
+        button {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px 5px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        button.encrypt {
+            background-color: #34c759;
+        }
+
+        button.decrypt {
+            background-color: #ff3b30;
+        }
+
+        button.reset {
+            background-color: #8e8e93;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
+        .message {
+            margin-top: 20px;
+            color: #34c759;
+            font-size: 1rem;
+        }
+
+        .error {
+            color: #ff3b30;
+            font-size: 1rem;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 12px;
+            text-align: left;
+        }
+
+        .result-box textarea {
+            background-color: white;
+            font-family: monospace;
+            resize: none;
+        }
+
+        .features {
+            display: flex;
+            justify-content: space-around;
+            margin: 40px 0;
+        }
+
+        .feature {
+            text-align: center;
+            width: 30%;
+        }
+
+        .feature img {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 10px;
+        }
+
+        .feature h3 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+
+        .feature p {
+            font-size: 1rem;
+            color: #6e6e73;
+        }
+
+        .cta {
+            margin: 30px 0;
+        }
+
+        .cta button {
+            font-size: 1.2rem;
+            padding: 15px 40px;
+            background-color: #007aff;
+        }
+
+        .cta button:hover {
+            background-color: #0063cc;
+        }
+
+        /* Smooth scrolling for anchor links */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secure Your Data with Advanced Encryption</h1>
+        <p>🔒 <strong>Your Security, Our Priority</strong><br>
+        Protect your sensitive information with military-grade encryption technology.</p>
+
+        <div class="features">
+            <div class="feature">
+                <img src="https://cdn-icons-png.flaticon.com/512/295/295128.png" alt="Encryption Icon">
+                <h3>Strong Encryption</h3>
+                <p>We use AES-256 encryption, trusted by governments and cybersecurity experts worldwide.</p>
+            </div>
+            <div class="feature">
+                <img src="https://cdn-icons-png.flaticon.com/512/159/159469.png" alt="Password Icon">
+                <h3>Password Protection</h3>
+                <p>Your data is encrypted with a unique password. Without it, no one can access your information.</p>
+            </div>
+            <div class="feature">
+                <img src="https://cdn-icons-png.flaticon.com/512/2889/2889676.png" alt="Shield Icon">
+                <h3>Salt & Hashing</h3>
+                <p>We add an extra layer of security using salted hashing to protect your password from brute-force attacks.</p>
+            </div>
+        </div>
+
+        <h2>Try It Now</h2>
+        <form method="POST">
+            <textarea id="enter-text" name="text" rows="5" placeholder="Enter text">{{ text if text else '' }}</textarea>
+            <input type="password" name="password" placeholder="Password">
+            <button type="submit" name="action" value="encrypt" class="encrypt">Encrypt</button>
+            <button type="submit" name="action" value="decrypt" class="decrypt">Decrypt</button>
+            <button type="submit" formaction="{{ url_for('reset') }}" class="reset">Reset</button>
+        </form>
+
+        {% if result %}
+        <div class="result-box">
+            <strong>Result:</strong><br>
+            <textarea rows="5" readonly>{{ result }}</textarea>
+        </div>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="cta">
+            <p>Your data is safe with us. Encrypt it now!</p>
+            <a href="#enter-text">
+                <button class="encrypt">Try It Now – Encrypt Your Data for Free!</button>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
