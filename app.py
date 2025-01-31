@@ -6,14 +6,14 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from dotenv import load_dotenv
 import logging
+import binascii
 
 app = Flask(__name__)
 load_dotenv()
 
-# Configure logging (essential for debugging on Vercel)
-logging.basicConfig(level=logging.ERROR)  # Or logging.DEBUG for more detail
-
-app.secret_key = os.getenv("FLASK_SECRET_KEY")  # Get secret key from environment variables
+# Configure logging
+logging.basicConfig(level=logging.ERROR)
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 def derive_key(password, salt=None):
     if not salt:
@@ -25,6 +25,12 @@ def derive_key(password, salt=None):
         iterations=100000,
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode())), salt
+
+def add_padding(data):
+    missing_padding = len(data) % 4
+    if missing_padding:
+        data += '=' * (4 - missing_padding)
+    return data
 
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -42,26 +48,35 @@ def home():
                 key, salt = derive_key(password)
                 cipher = Fernet(key)
                 encrypted = cipher.encrypt(text.encode())
-
-                # Prepend the salt to the ciphertext (important!)
                 combined = base64.urlsafe_b64encode(salt + encrypted).decode()
                 flash("Text encrypted!", "success")
                 return render_template("index.html", result=combined, text=text)
 
             elif action == "decrypt":
-                combined = base64.urlsafe_b64decode(text.encode())
+                # Handle Base64 padding
+                text_padded = add_padding(text)
+                combined = base64.urlsafe_b64decode(text_padded.encode())
+                
+                # Validate data length
+                if len(combined) < 16:
+                    flash("Invalid encrypted text format.", "error")
+                    return render_template("index.html", text=text)
+                
                 salt = combined[:16]
                 encrypted = combined[16:]
-                key, _ = derive_key(password, salt) # Derive key using salt from combined data
+                key, _ = derive_key(password, salt)
                 cipher = Fernet(key)
                 decrypted = cipher.decrypt(encrypted).decode()
                 flash("Text decrypted!", "success")
                 return render_template("index.html", result=decrypted, text=text)
 
+        except (binascii.Error, ValueError) as e:
+            flash("Invalid encrypted text format - check your input and password", "error")
+            return render_template("index.html", text=text)
         except Exception as e:
-            logging.exception("An error occurred:")  # Log the full traceback
+            logging.exception("An error occurred:")
             flash(f"An error occurred: {str(e)}", "error")
-            return render_template("index.html", result=text, text=text)  # Keep input
+            return render_template("index.html", text=text)
 
     return render_template("index.html")
 
