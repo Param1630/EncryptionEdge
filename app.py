@@ -5,12 +5,16 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from dotenv import load_dotenv
+import logging
 
 app = Flask(__name__)
 load_dotenv()
-app.config['SECRET_KEY'] = '37adbff8a00bce49a1b4dcd59f1205b20c9ab04848174e76caa4d97a586375ce'
 
-# Function to derive a key from a password
+# Configure logging (essential for debugging on Vercel)
+logging.basicConfig(level=logging.ERROR)  # Or logging.DEBUG for more detail
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY")  # Get secret key from environment variables
+
 def derive_key(password, salt=None):
     if not salt:
         salt = os.urandom(16)
@@ -22,27 +26,6 @@ def derive_key(password, salt=None):
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode())), salt
 
-# Function to save the key to a file
-def save_key(password):
-    key, salt = derive_key(password)
-    with open("encryption_key.key", "wb") as f:
-        f.write(salt + key)
-    return key
-
-# Function to load the key from a file
-def load_key(password):
-    try:
-        with open("encryption_key.key", "rb") as f:
-            data = f.read()
-            salt, stored_key = data[:16], data[16:]
-        key, _ = derive_key(password, salt)
-        if key == stored_key:
-            return key
-    except (FileNotFoundError, ValueError):
-        pass
-    return None
-
-# Home page
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
@@ -54,28 +37,34 @@ def home():
             flash("Enter text and password.", "error")
             return redirect(url_for("home"))
 
-        if action == "encrypt":
-            key = load_key(password) or save_key(password)
-            encrypted = Fernet(key).encrypt(text.encode()).decode()
-            flash("Text encrypted!", "success")
-            return render_template("index.html", result=encrypted, text=text)
+        try:
+            if action == "encrypt":
+                key, salt = derive_key(password)
+                cipher = Fernet(key)
+                encrypted = cipher.encrypt(text.encode())
 
-        elif action == "decrypt":
-            key = load_key(password)
-            if not key:
-                flash("Invalid password. Please try again.", "error")
-                return render_template("index.html", result=text, text=text)  # Keep encrypted text
-            try:
-                decrypted = Fernet(key).decrypt(text.encode()).decode()
+                # Prepend the salt to the ciphertext (important!)
+                combined = base64.urlsafe_b64encode(salt + encrypted).decode()
+                flash("Text encrypted!", "success")
+                return render_template("index.html", result=combined, text=text)
+
+            elif action == "decrypt":
+                combined = base64.urlsafe_b64decode(text.encode())
+                salt = combined[:16]
+                encrypted = combined[16:]
+                key, _ = derive_key(password, salt) # Derive key using salt from combined data
+                cipher = Fernet(key)
+                decrypted = cipher.decrypt(encrypted).decode()
                 flash("Text decrypted!", "success")
                 return render_template("index.html", result=decrypted, text=text)
-            except Exception:
-                flash("Decryption failed. Invalid password or corrupted data.", "error")
-                return render_template("index.html", result=text, text=text)  # Keep encrypted text
+
+        except Exception as e:
+            logging.exception("An error occurred:")  # Log the full traceback
+            flash(f"An error occurred: {str(e)}", "error")
+            return render_template("index.html", result=text, text=text)  # Keep input
 
     return render_template("index.html")
 
-# Reset functionality
 @app.route("/reset", methods=["POST"])
 def reset():
     return redirect(url_for("home"))
