@@ -8,14 +8,28 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature, InvalidKey
 from dotenv import load_dotenv
+from flask_limiter import Limiter
 
 # Initialize environment and logging
 load_dotenv()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates")
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-secret-key-for-dev")
+
+limiter = Limiter(app=app, key_func=lambda: request.remote_addr)
+
+@app.after_request
+def add_csp(response):
+    # Updated CSP header to allow images from the CDN and inline styles
+    csp_policy = (
+        "default-src 'self'; "
+        "img-src 'self' https://cdn-icons-png.flaticon.com; "
+        "style-src 'self' 'unsafe-inline';"
+    )
+    response.headers["Content-Security-Policy"] = csp_policy
+    return response
 
 # ================== Core Functions ==================
 def derive_key(password, salt=None):
@@ -38,6 +52,11 @@ def add_padding(data):
     return data
 
 # ================== Routes ==================
+@app.route("/", methods=["POST"])
+@limiter.limit("5/minute")
+def home_post():
+    return home()
+
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
@@ -95,7 +114,6 @@ def home():
 @app.route("/reset", methods=["POST"])
 def reset():
     return redirect(url_for("home"))
-
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
