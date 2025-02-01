@@ -1,3 +1,4 @@
-flask
-cryptography
-gunicorn
+flask==2.0.3
+cryptography==3.4.7
+gunicorn==20.1.0
+python-dotenv==0.19.2
